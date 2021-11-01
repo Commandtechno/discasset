@@ -1,8 +1,11 @@
-const { url, base, jsRegex } = require("./constants");
+const { url, base } = require("./constants");
 
+const { rm, writeFile } = require("fs/promises");
+const { existsSync } = require("fs");
 const { parse } = require("@babel/parser");
 const { load } = require("cheerio");
 const traverse = require("@babel/traverse").default;
+const extract = require("extract-zip");
 const robert = require("robert");
 
 const cache = {};
@@ -15,6 +18,37 @@ async function fetch(path) {
   const res = await robert.get(url).send("text");
   cache[url] = res;
   return res;
+}
+
+async function GIFSKI() {
+  try {
+    spawnSync("gifski");
+    return;
+  } catch {}
+
+  process.env.GIFSKI_PATH = __dirname + "/gifski/";
+  switch (process.platform) {
+    case "win32":
+      process.env.GIFSKI_PATH += "win/gifski.exe";
+      break;
+    case "darwin":
+      process.env.GIFSKI_PATH += "mac/gifski";
+      break;
+    case "linux":
+      process.env.GIFSKI_PATH += "debian/gifski";
+      break;
+    default:
+      console.log("Gifski not supported on platform: " + process.platform);
+      process.exit();
+  }
+
+  if (!existsSync(process.env.GIFSKI_PATH)) {
+    console.log("Downloading Gifski");
+    const file = await robert.get("https://gif.ski/gifski-1.5.0.zip").send("buffer");
+    await writeFile("gifski.zip", file);
+    await extract("gifski.zip", { dir: __dirname + "/gifski" });
+    await rm("gifski.zip");
+  }
 }
 
 async function HTML() {
@@ -62,7 +96,10 @@ async function* JS() {
 }
 
 module.exports = {
+  GIFSKI,
   HTML,
   CSS,
   JS
 };
+
+GIFSKI();

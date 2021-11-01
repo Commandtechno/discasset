@@ -15,6 +15,6 @@ fuck assets, get bitches
 ```
 git clone https://github.com/Commandtechno/discasset-new
 cd discasset-new
-npm i
+npm i --no-optional
 node .
 ```

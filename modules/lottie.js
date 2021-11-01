@@ -1,13 +1,25 @@
 const { output, verbose } = require("../config");
-const download = require("../download").JS;
+const { GIFSKI, JS } = require("../download");
 
+const { writeFile, rename } = require("fs/promises");
+const { execFile } = require("child_process");
 const { parse } = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
-const render = require("puppeteer-lottie");
+
+let puppeteer;
+try {
+  puppeteer = require("puppeteer-lottie");
+} catch {}
 
 async function main() {
+  if (!puppeteer && process.platform === "win32") await GIFSKI();
+  else {
+    console.log("Puppeteer lottie not found, can only use rlottie on windows");
+    process.exit();
+  }
+
   const resolve = (await import("p-all")).default;
-  const files = await download();
+  const files = await JS();
 
   console.log("Parsing JavaScript");
   const assets = [];
@@ -52,14 +64,23 @@ async function main() {
   console.log("Rendering assets");
   const promises = assets.map(asset => async () => {
     if (verbose) console.log("Rendering " + asset.nm);
-    const path = output + "/lottie/" + asset.nm + ".gif";
-    await render({
-      quiet: true,
-      output: path,
-      animationData: asset
-    });
 
-    if (verbose) console.log("Rendered" + asset.nm);
+    const json = output + "/lottie/json/" + asset.nm + ".json";
+    const gif = output + "/lottie/gif/" + asset.nm + ".gif";
+    await writeFile(json, JSON.stringify(asset));
+
+    if (puppeteer) {
+      await puppeteer({
+        quiet: true,
+        output: gif,
+        animationData: asset
+      });
+    } else {
+      await new Promise(resolve => execFile("static/lottie2gif", [json, "500x500"], resolve));
+      await rename(asset.nm + ".json.gif", gif);
+    }
+
+    if (verbose) console.log("Rendered " + asset.nm);
   });
 
   await resolve(promises, { concurrency: 10 });
