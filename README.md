@@ -12,9 +12,11 @@ does not currently get svgs
 
 fuck assets, get bitches
 
+note: if you want it to use puppeteer-lottie instead of rlottie do npm i puppeteer-lottie
+
 ```
 git clone https://github.com/Commandtechno/discasset-new
 cd discasset-new
-npm i --no-optional
+npm i
 node .
 ```

@@ -12,10 +12,13 @@ try {
 } catch {}
 
 async function main() {
-  if (!puppeteer && process.platform === "win32") await GIFSKI();
-  else {
-    console.log("Puppeteer lottie not found, can only use rlottie on windows");
-    process.exit();
+  if (!puppeteer) {
+    if (process.platform !== "win32") {
+      console.log("Puppeteer lottie not found, can only use rlottie on windows");
+      process.exit();
+    }
+
+    await GIFSKI();
   }
 
   const resolve = (await import("p-all")).default;
@@ -69,13 +72,13 @@ async function main() {
     const gif = output + "/lottie/gif/" + asset.nm + ".gif";
     await writeFile(json, JSON.stringify(asset));
 
-    if (puppeteer) {
+    if (puppeteer)
       await puppeteer({
         quiet: true,
         output: gif,
         animationData: asset
       });
-    } else {
+    else {
       await new Promise(resolve => execFile("static/lottie2gif", [json, "500x500"], resolve));
       await rename(asset.nm + ".json.gif", gif);
     }
