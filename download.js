@@ -1,70 +1,50 @@
-const { url, base } = require("./constants");
+const { htmlUrl, baseUrl } = require("./constants");
+const { verbose } = require("./config");
 
-const { rm, writeFile } = require("fs/promises");
-const { existsSync } = require("fs");
-const { parse } = require("@babel/parser");
+const { ancestor } = require("acorn-walk");
+const { parse } = require("acorn");
 const { load } = require("cheerio");
-const traverse = require("@babel/traverse").default;
-const extract = require("extract-zip");
-const robert = require("robert");
+const robert = require("robert").default;
+const chalk = require("chalk");
 
+const prefix = "[" + chalk.bgBlue(chalk.black(" DOWNLOAD ")) + "]";
 const cache = {};
-let cssURL;
-let jsURLs = new Set();
+const jsUrls = new Set();
+
+let html;
+let cssUrl;
 
 async function fetch(path) {
-  const url = new URL(path, base);
+  const url = new URL(path, baseUrl).toString();
   if (cache[url]) return cache[url];
+
+  if (verbose) console.log(prefix, chalk.blue("Fetching"), url);
   const res = await robert.get(url).send("text");
+  if (verbose) console.log(prefix, chalk.green("Fetched"), url);
+
   cache[url] = res;
   return res;
 }
 
-async function GIFSKI() {
-  try {
-    spawnSync("gifski");
-    return;
-  } catch {}
-
-  process.env.GIFSKI_PATH = __dirname + "/gifski/";
-  switch (process.platform) {
-    case "win32":
-      process.env.GIFSKI_PATH += "win/gifski.exe";
-      break;
-    case "darwin":
-      process.env.GIFSKI_PATH += "mac/gifski";
-      break;
-    case "linux":
-      process.env.GIFSKI_PATH += "debian/gifski";
-      break;
-    default:
-      console.log("Gifski not supported on platform: " + process.platform);
-      process.exit();
-  }
-
-  if (!existsSync(process.env.GIFSKI_PATH)) {
-    console.log("Downloading Gifski");
-    const file = await robert.get("https://gif.ski/gifski-1.5.0.zip").send("buffer");
-    await writeFile("gifski.zip", file);
-    await extract("gifski.zip", { dir: __dirname + "/gifski" });
-    await rm("gifski.zip");
-  }
-}
-
 async function HTML() {
-  html = await fetch(url);
+  if (html) return html;
 
-  const scripts = load(html)("script").filter((_, script) => script.attribs.src);
-  const firstURL = scripts.first().attr("src");
-  const lastURL = scripts.last().attr("src");
+  html = load(await fetch(htmlUrl));
+  cssUrl = html("link").first().attr("href");
 
-  jsURLs.add(firstURL);
-  jsURLs.add(lastURL);
-  const first = await fetch(firstURL);
+  const scripts = html("script").filter(
+    (_, script) => script.attribs.src && !script.attribs.src.startsWith("/cdn-cgi")
+  );
 
-  traverse(parse(first), {
-    enter({ node, parent }) {
-      if (node.type !== "StringLiteral" || node.value !== ".js") return;
+  for (const script of scripts) jsUrls.add(script.attribs.src);
+  const firstUrl = scripts.first().attr("src");
+  const first = await fetch(firstUrl);
+
+  ancestor(parse(first), {
+    Literal(node, ancestors) {
+      if (node.value !== ".js") return;
+
+      const parent = ancestors[ancestors.length - 2];
       if (parent?.type !== "BinaryExpression" || parent.operator !== "+") return;
 
       const { left } = parent;
@@ -74,32 +54,33 @@ async function HTML() {
       if (object?.type !== "ObjectExpression") return;
 
       const { properties } = object;
-      if (!properties?.length) return;
-
-      properties.forEach(({ value }) => jsURLs.add("/assets/" + value.value + ".js"));
+      for (const property of properties) jsUrls.add("/assets/" + property.value.value + ".js");
     }
   });
 
-  cssURL = load(html)("link").first().attr("href");
   return html;
 }
 
 async function CSS() {
-  if (!cssURL) await HTML();
-  css = await fetch(cssURL);
+  if (!cssUrl) await HTML();
+  css = await fetch(cssUrl);
   return css;
 }
 
-async function* JS() {
-  if (!jsURLs.size) await HTML();
-  for (const jsURL of jsURLs) yield fetch(jsURL);
+async function JS() {
+  if (!jsUrls.size) await HTML();
+
+  const files = [];
+  for (const jsUrl of jsUrls) {
+    const file = fetch(jsUrl);
+    files.push(file);
+  }
+
+  return files;
 }
 
 module.exports = {
-  GIFSKI,
   HTML,
   CSS,
   JS
 };
-
-GIFSKI();

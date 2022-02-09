@@ -1,56 +1,57 @@
-const { output, verbose } = require("../config");
+require("../init");
+
+const { output, verbose, concurrency } = require("../config");
 const constants = require("../constants");
 const download = require("../download").JS;
 
-const { extname, basename } = require("path");
+const { resolve, extname, basename } = require("path");
+const { tokenizer } = require("acorn");
 const { writeFile } = require("fs/promises");
-const { parse } = require("@babel/parser");
-
-const traverse = require("@babel/traverse").default;
-const robert = require("robert");
+const robert = require("robert").default;
+const chalk = require("chalk");
 const mime = require("mime-types");
 
 const extensions = new Set(Object.keys(mime.types));
+const prefix = "[" + chalk.bgBlue(chalk.black(" CDN ")) + "]";
 
-async function main() {
-  const resolve = (await import("p-all")).default;
+module.exports = async function () {
+  const map = (await import("p-map")).default;
   const files = await download();
 
-  console.log("Parsing JavaScript");
+  console.log(prefix, "Processing", files.length, "files...");
   const assets = [];
-  for await (const file of files)
-    traverse(parse(file), {
-      enter({ node: { type, value } }) {
-        if (type !== "StringLiteral") return;
+  await map(
+    files,
+    file => {
+      for (const { type, value } of tokenizer(file, { ecmaVersion: "latest" })) {
+        if (type.label !== "string") continue;
 
         const ext = extname(value);
-        if (!ext || !extensions.has(ext.slice(1))) return;
+        if (!ext || !extensions.has(ext.slice(1))) continue;
 
         const name = basename(value, ext);
-        if (!constants.regex.test(name)) return;
+        if (!constants.regex.test(name)) continue;
 
         assets.push(value);
       }
-    });
+    },
+    { concurrency }
+  );
 
-  console.log("Downloading assets");
-  const promises = assets.map(asset => async () => {
-    const url = constants.assets + "/" + asset;
+  console.log(prefix, "Downloading", assets.length, "assets...");
+  await map(assets, async asset => {
+    const url = new URL("/assets/" + asset, constants.assetsUrl).toString();
+    if (verbose) console.log(prefix, chalk.blue("Fetching"), url);
 
-    if (verbose) console.log("Fetching " + url);
     const file = await robert.get(url).send("buffer");
+    if (verbose) console.log(prefix, chalk.green("Fetched"), url);
 
-    let path = output + "/cdn";
-    if (file.includes(constants.twemoji)) path += "/twemoji";
-    path += "/" + asset;
+    let path = resolve(output, "cdn");
+    if (file.includes(constants.baseTwemoji)) path = resolve(path, "twemoji");
 
-    if (verbose) console.log("Writing " + path);
+    path = resolve(path, asset);
     await writeFile(path, file);
   });
 
-  await resolve(promises, { concurrency: 100 });
-  return promises.length;
-}
-
-if (require.main === module) main();
-else module.exports = main;
+  console.log(prefix, "Done");
+};

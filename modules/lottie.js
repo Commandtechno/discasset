@@ -1,56 +1,54 @@
-const { output, verbose } = require("../config");
-const { GIFSKI, JS } = require("../download");
+require("../init");
 
-const { writeFile, rename } = require("fs/promises");
-const { execFile } = require("child_process");
-const { parse } = require("@babel/parser");
-const traverse = require("@babel/traverse").default;
+const { output, verbose, concurrency } = require("../config");
+const { JS } = require("../download");
 
-let puppeteer;
-try {
-  puppeteer = require("puppeteer-lottie");
-} catch {}
+const { tokenizer } = require("acorn");
+const { writeFile } = require("fs/promises");
+const { resolve } = require("path");
+const puppeteer = require("puppeteer-lottie");
+const chalk = require("chalk");
 
-async function main() {
-  if (!puppeteer) {
-    if (process.platform !== "win32") {
-      console.log("Puppeteer lottie not found, can only use rlottie on windows");
-      process.exit();
-    }
+const prefix = "[" + chalk.bgBlue(chalk.black(" LOTTIE ")) + "]";
 
-    await GIFSKI();
+module.exports = async function () {
+  let GIFSKI_PATH = resolve(require.resolve("gifski"), "..", "bin");
+  switch (process.platform) {
+    case "win32":
+      GIFSKI_PATH = resolve(GIFSKI_PATH, "windows", "gifski.exe");
+      break;
+
+    case "darwin":
+      GIFSKI_PATH = resolve(GIFSKI_PATH, "macos", "gifski");
+      break;
+
+    case "linux":
+      GIFSKI_PATH = resolve(GIFSKI_PATH, "debian", "gifski");
+      break;
+
+    default:
+      console.log(prefix, `Unsupported gifski platform: ${process.platform}`);
+      return;
   }
 
-  const resolve = (await import("p-all")).default;
+  const map = (await import("p-map")).default;
   const files = await JS();
 
-  console.log("Parsing JavaScript");
+  console.log(prefix, "Processing", files.length, "files...");
   const assets = [];
-  for await (const file of files)
-    traverse(parse(file), {
-      enter({ node }) {
-        if ("CallExpression" !== node.type) return;
+  await map(
+    files,
+    file => {
+      for (const { type, value } of tokenizer(file)) {
+        if (type.label !== "string" || !value.startsWith("{") || !value.endsWith("}")) continue;
 
-        const {
-          arguments: args,
-          callee: { object, property }
-        } = node;
+        let asset;
+        try {
+          asset = JSON.parse(value);
+        } catch {
+          continue;
+        }
 
-        if (
-          !object ||
-          !property ||
-          object.type !== "Identifier" ||
-          object.name !== "JSON" ||
-          property.type !== "Identifier" ||
-          property.name !== "parse" ||
-          args.length !== 1
-        )
-          return;
-
-        const [{ type, value }] = args;
-        if (type !== "StringLiteral") return;
-
-        const asset = JSON.parse(value);
         if (
           !asset.v || // version
           !asset.fr || // framerate
@@ -58,37 +56,29 @@ async function main() {
           !asset.h || // height
           !asset.nm // name
         )
-          return;
+          continue;
 
         assets.push(asset);
       }
+    },
+    { concurrency }
+  );
+
+  console.log(prefix, "Rendering", assets.length, "assets...");
+  process.env.GIFSKI_PATH = GIFSKI_PATH;
+
+  for (const asset of assets) {
+    const name = asset.nm;
+    console.log(prefix, chalk.blue("Rendering"), name);
+
+    const path = resolve(output, "lottie", name);
+    await writeFile(path + ".json", JSON.stringify(asset));
+    await puppeteer({
+      quiet: true,
+      output: path + ".gif",
+      animationData: asset
     });
 
-  console.log("Rendering assets");
-  const promises = assets.map(asset => async () => {
-    if (verbose) console.log("Rendering " + asset.nm);
-
-    const json = output + "/lottie/json/" + asset.nm + ".json";
-    const gif = output + "/lottie/gif/" + asset.nm + ".gif";
-    await writeFile(json, JSON.stringify(asset));
-
-    if (puppeteer)
-      await puppeteer({
-        quiet: true,
-        output: gif,
-        animationData: asset
-      });
-    else {
-      await new Promise(resolve => execFile("static/lottie2gif", [json, "500x500"], resolve));
-      await rename(asset.nm + ".json.gif", gif);
-    }
-
-    if (verbose) console.log("Rendered " + asset.nm);
-  });
-
-  await resolve(promises, { concurrency: 10 });
-  return promises.length;
-}
-
-if (require.main === module) main();
-else module.exports = main;
+    console.log(prefix, chalk.green("Rendering"), name);
+  }
+};
