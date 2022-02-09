@@ -6,10 +6,9 @@ const lottie = require("./modules/lottie");
 // const svg = require("./modules/svg");
 
 async function main() {
-  // await cdn();
-  // await css();
+  await cdn();
+  await css();
   await lottie();
-  return;
 }
 
 main();
