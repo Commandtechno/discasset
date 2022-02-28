@@ -3,6 +3,7 @@ require("../init");
 const { output, verbose, concurrency } = require("../config");
 const { JS } = require("../download");
 
+const { existsSync } = require("fs");
 const { tokenizer } = require("acorn");
 const { writeFile } = require("fs/promises");
 const { resolve } = require("path");
@@ -35,7 +36,7 @@ module.exports = async function () {
   const files = await JS();
 
   console.log(prefix, "Processing", files.length, "files...");
-  const assets = [];
+  const assets = new Map();
   await map(
     files,
     file => {
@@ -58,20 +59,25 @@ module.exports = async function () {
         )
           continue;
 
-        assets.push(asset);
+        const name = asset.nm;
+        assets.set(name, asset);
       }
     },
     { concurrency }
   );
 
-  console.log(prefix, "Rendering", assets.length, "assets...");
+  console.log(prefix, "Rendering", assets.size, "assets...");
   process.env.GIFSKI_PATH = GIFSKI_PATH;
 
-  for (const asset of assets) {
-    const name = asset.nm;
+  for (const [name, asset] of assets) {
+    const path = resolve(output, "lottie", name);
+    if (existsSync(path)) {
+      if (verbose) console.log(prefix, chalk.blue("Skipping"), name);
+      return;
+    }
+
     console.log(prefix, chalk.blue("Rendering"), name);
 
-    const path = resolve(output, "lottie", name);
     await writeFile(path + ".json", JSON.stringify(asset));
     await puppeteer({
       quiet: true,

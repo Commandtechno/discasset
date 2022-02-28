@@ -30,7 +30,7 @@ async function HTML() {
   if (html) return html;
 
   html = load(await fetch(htmlUrl));
-  cssUrl = html("link").first().attr("href");
+  cssUrl = html('link[rel="stylesheet"]').first().attr("href");
 
   const scripts = html("script").filter(
     (_, script) => script.attribs.src && !script.attribs.src.startsWith("/cdn-cgi")

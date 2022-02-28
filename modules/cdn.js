@@ -5,8 +5,9 @@ const constants = require("../constants");
 const download = require("../download").JS;
 
 const { resolve, extname, basename } = require("path");
-const { tokenizer } = require("acorn");
+const { existsSync } = require("fs");
 const { writeFile } = require("fs/promises");
+const { tokenizer } = require("acorn");
 const robert = require("robert").default;
 const chalk = require("chalk");
 const mime = require("mime-types");
@@ -19,7 +20,7 @@ module.exports = async function () {
   const files = await download();
 
   console.log(prefix, "Processing", files.length, "files...");
-  const assets = [];
+  const assets = new Set();
   await map(
     files,
     file => {
@@ -32,24 +33,29 @@ module.exports = async function () {
         const name = basename(value, ext);
         if (!constants.regex.test(name)) continue;
 
-        assets.push(value);
+        assets.add(value);
       }
     },
     { concurrency }
   );
 
-  console.log(prefix, "Downloading", assets.length, "assets...");
+  require("fs").writeFileSync("urls.json", JSON.stringify([...assets]));
+  console.log(prefix, "Downloading", assets.size, "assets...");
   await map(assets, async asset => {
-    const url = new URL("/assets/" + asset, constants.assetsUrl).toString();
+    let url = new URL("/assets/" + asset, constants.assetsUrl).toString();
+    let path = resolve(output, "cdn", asset);
+    let twemojiPath = resolve(output, "cdn", "twemoji", asset);
+    if (existsSync(path) || existsSync(twemojiPath)) {
+      if (verbose) console.log(prefix, chalk.blue("Skipping"), url);
+      return;
+    }
+
     if (verbose) console.log(prefix, chalk.blue("Fetching"), url);
 
     const file = await robert.get(url).send("buffer");
     if (verbose) console.log(prefix, chalk.green("Fetched"), url);
 
-    let path = resolve(output, "cdn");
-    if (file.includes(constants.baseTwemoji)) path = resolve(path, "twemoji");
-
-    path = resolve(path, asset);
+    if (file.includes(constants.baseTwemoji)) path = twemojiPath;
     await writeFile(path, file);
   });
 

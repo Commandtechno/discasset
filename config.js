@@ -4,6 +4,6 @@ module.exports = {
   environment: "canary",
   host: "discord.com",
   output: resolve(__dirname, "output"),
-  verbose: true,
+  verbose: false,
   concurrency: 100
 };

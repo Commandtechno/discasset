@@ -6,6 +6,7 @@ const download = require("../download").CSS;
 
 const { resolve, extname } = require("path");
 const { parse, walk } = require("css-tree");
+const { existsSync } = require("fs");
 const { writeFile } = require("fs/promises");
 const { extension } = require("mime-types");
 const parseURI = require("data-urls");
@@ -18,7 +19,7 @@ module.exports = async function () {
   const map = (await import("p-map")).default;
 
   const file = await download();
-  const assets = [];
+  const assets = new Set();
 
   let parent;
   let ignore;
@@ -36,7 +37,7 @@ module.exports = async function () {
 
       case "Url":
         if (ignore) break;
-        assets.push({
+        assets.add({
           name: parent,
           type: value.type,
           value: value.value
@@ -46,7 +47,7 @@ module.exports = async function () {
     }
   });
 
-  console.log(prefix, "Downloading", assets.length, "assets...");
+  console.log(prefix, "Downloading", assets.size, "assets...");
   await map(
     assets,
     async ({ name, type, value }) => {
@@ -57,6 +58,11 @@ module.exports = async function () {
         case "String":
           const uri = parseURI(value.slice(1, -1));
           path += extension(uri.mimeType.toString());
+          if (existsSync(path)) {
+            if (verbose) console.log(prefix, chalk.blue("Skipping"), url);
+            return;
+          }
+
           data = uri.body;
           break;
 
@@ -67,6 +73,10 @@ module.exports = async function () {
           }
 
           path += extname(value);
+          if (existsSync(path)) {
+            if (verbose) console.log(prefix, chalk.blue("Skipping"), url);
+            return;
+          }
 
           const url = new URL(value, assetsUrl).toString();
           if (verbose) console.log(prefix, chalk.blue("Fetching"), url);
