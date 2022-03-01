@@ -24,7 +24,9 @@ module.exports = async function () {
   await map(
     files,
     file => {
-      for (const { type, value } of tokenizer(file, { ecmaVersion: "latest" })) {
+      for (const { type, value } of tokenizer(file, {
+        ecmaVersion: "latest"
+      })) {
         if (type.label !== "string") continue;
 
         const ext = extname(value);
@@ -39,7 +41,6 @@ module.exports = async function () {
     { concurrency }
   );
 
-  require("fs").writeFileSync("urls.json", JSON.stringify([...assets]));
   console.log(prefix, "Downloading", assets.size, "assets...");
   await map(assets, async asset => {
     let url = new URL("/assets/" + asset, constants.assetsUrl).toString();

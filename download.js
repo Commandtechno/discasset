@@ -33,7 +33,8 @@ async function HTML() {
   cssUrl = html('link[rel="stylesheet"]').first().attr("href");
 
   const scripts = html("script").filter(
-    (_, script) => script.attribs.src && !script.attribs.src.startsWith("/cdn-cgi")
+    (_, script) =>
+      script.attribs.src && !script.attribs.src.startsWith("/cdn-cgi")
   );
 
   for (const script of scripts) jsUrls.add(script.attribs.src);
@@ -45,7 +46,8 @@ async function HTML() {
       if (node.value !== ".js") return;
 
       const parent = ancestors[ancestors.length - 2];
-      if (parent?.type !== "BinaryExpression" || parent.operator !== "+") return;
+      if (parent?.type !== "BinaryExpression" || parent.operator !== "+")
+        return;
 
       const { left } = parent;
       if (left?.type !== "MemberExpression") return;
@@ -54,7 +56,8 @@ async function HTML() {
       if (object?.type !== "ObjectExpression") return;
 
       const { properties } = object;
-      for (const property of properties) jsUrls.add("/assets/" + property.value.value + ".js");
+      for (const property of properties)
+        jsUrls.add("/assets/" + property.value.value + ".js");
     }
   });
 
