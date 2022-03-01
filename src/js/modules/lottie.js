@@ -1,7 +1,7 @@
-require("../init");
+require("../../../init");
 
-const { output, verbose, concurrency } = require("../config");
-const { JS } = require("../download");
+const { output, verbose, concurrency } = require("../../../config");
+const { JS } = require("../../../download");
 
 const { existsSync } = require("fs");
 const { tokenizer } = require("acorn");
@@ -41,7 +41,12 @@ module.exports = async function () {
     files,
     file => {
       for (const { type, value } of tokenizer(file)) {
-        if (type.label !== "string" || !value.startsWith("{") || !value.endsWith("}")) continue;
+        if (
+          type.label !== "string" ||
+          !value.startsWith("{") ||
+          !value.endsWith("}")
+        )
+          continue;
 
         let asset;
         try {
