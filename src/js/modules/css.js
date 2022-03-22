@@ -1,8 +1,8 @@
-require("../../../init");
+require("../init");
 
-const { output, verbose, concurrency } = require("../../../config");
-const { assetsUrl } = require("../../../constants");
-const download = require("../../../download").CSS;
+const { output, verbose, concurrency } = require("../config");
+const { assetsUrl } = require("../constants");
+const download = require("../download").CSS;
 
 const { resolve, extname } = require("path");
 const { parse, walk } = require("css-tree");

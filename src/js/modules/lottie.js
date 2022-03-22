@@ -1,19 +1,20 @@
-require("../../../init");
+require("../init");
 
-const { output, verbose, concurrency } = require("../../../config");
-const { JS } = require("../../../download");
+const { output, verbose, concurrency } = require("../config");
+const { JS } = require("../download");
 
 const { existsSync } = require("fs");
 const { tokenizer } = require("acorn");
 const { writeFile } = require("fs/promises");
 const { resolve } = require("path");
-const puppeteer = require("puppeteer-lottie");
+// const puppeteer = require("puppeteer-lottie");
 const chalk = require("chalk");
 
 const prefix = "[" + chalk.bgBlue(chalk.black(" LOTTIE ")) + "]";
 
 module.exports = async function () {
-  let GIFSKI_PATH = resolve(require.resolve("gifski"), "..", "bin");
+  let GIFSKI_PATH = "";
+  // let GIFSKI_PATH = resolve(require.resolve("gifski"), "..", "bin");
   switch (process.platform) {
     case "win32":
       GIFSKI_PATH = resolve(GIFSKI_PATH, "windows", "gifski.exe");
@@ -84,11 +85,11 @@ module.exports = async function () {
     console.log(prefix, chalk.blue("Rendering"), name);
 
     await writeFile(path + ".json", JSON.stringify(asset));
-    await puppeteer({
-      quiet: true,
-      output: path + ".gif",
-      animationData: asset
-    });
+    // await puppeteer({
+    //   quiet: true,
+    //   output: path + ".gif",
+    //   animationData: asset
+    // });
 
     console.log(prefix, chalk.green("Rendering"), name);
   }

@@ -2,42 +2,31 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"os"
+	"strings"
 )
 
-func getBaseUrl() *url.URL {
-	baseUrl, err := url.Parse("https://canary.discord.com")
-	if err != nil {
-		panic(err)
-	}
-
-	return baseUrl
-}
-
-func getHtml() string {
-	baseUrl := getBaseUrl()
-	loginUrl, err := baseUrl.Parse("/login")
-	if err != nil {
-		panic(err)
-	}
-
-	res, err := http.Get(loginUrl.String())
-	if err != nil {
-		panic(err)
-	}
-
-	defer res.Body.Close()
-	html, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	return string(html)
-}
-
 func main() {
-	html := getHtml()
-	fmt.Println(html)
+	for {
+		var line string
+		_, err := fmt.Scanln(&line)
+		if err != nil {
+			panic(err)
+		}
+
+		args := strings.Split(line, ";")
+		switch args[0] {
+		case "DOWNLOAD":
+			download(args[1], args[2])
+
+		case "RENDER_LOTTIE":
+			renderLottie(args[1], args[2])
+
+		case "EXIT":
+			os.Exit(0)
+
+		default:
+			fmt.Println("Unknown command")
+		}
+	}
 }
