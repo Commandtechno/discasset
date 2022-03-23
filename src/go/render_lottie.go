@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/gif"
@@ -23,8 +22,6 @@ func imageFromBuffer(p []byte, w uint, h uint) *image.RGBA {
 }
 
 func renderLottie(inputPath string, outputPath string) {
-	fmt.Println(inputPath, outputPath)
-
 	input, err := os.ReadFile(inputPath)
 	if err != nil {
 		panic(err)
@@ -35,7 +32,7 @@ func renderLottie(inputPath string, outputPath string) {
 		panic(err)
 	}
 
-	animation := lottie.LottieAnimationFromData(string(input), "", "")
+	animation := lottie.LottieAnimationFromData(string(input), inputPath, inputPath)
 	width, height := lottie.LottieAnimationGetSize(animation)
 
 	frameCount := float32(lottie.LottieAnimationGetTotalframe(animation))

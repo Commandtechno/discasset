@@ -1,26 +1,31 @@
-const constants = require("../constants");
+import { OUTPUT_DIR } from "../constants";
+import { download } from "../util";
 
-const { extname, basename } = require("path");
-const { tokenizer } = require("acorn");
-const mime = require("mime-types");
+import { extname, basename, resolve } from "path";
+import { existsSync } from "fs";
+import { tokenizer } from "acorn";
+import { mkdir } from "fs/promises";
+import mimeTypes from "mime-types";
 
-const extensions = new Set(Object.keys(mime.types));
+const validExtensions = new Set(Object.keys(mimeTypes.types));
+const hashRegex = /^[a-zA-Z0-9]{32}$/;
 
-export default function cdn(file: string) {
-  const assets = new Set<string>();
+const dir = resolve(OUTPUT_DIR, "cdn");
+
+export default async function Cdn(file: string) {
+  if (!existsSync(dir)) await mkdir(dir, { recursive: true });
   for (const { type, value } of tokenizer(file, {
     ecmaVersion: "latest"
   })) {
     if (type.label !== "string") continue;
 
     const ext = extname(value);
-    if (!ext || !extensions.has(ext.slice(1))) continue;
+    if (!ext || !validExtensions.has(ext.slice(1))) continue;
 
     const name = basename(value, ext);
-    if (!constants.regex.test(name)) continue;
+    if (!hashRegex.test(name)) continue;
 
-    assets.add(value);
+    const url = "/assets/" + value;
+    download(url, "cdn", value);
   }
-
-  return assets;
 }
